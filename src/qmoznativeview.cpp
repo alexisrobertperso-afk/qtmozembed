@@ -23,7 +23,11 @@
 #include <QWindow>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#if defined(QT_OPENGL_ES_2)
 #include <GLES2/gl2ext.h>
+#else
+#include "qmozglcompat_p.h"
+#endif
 
 using namespace QtMoz;
 

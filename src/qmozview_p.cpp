@@ -1007,7 +1007,11 @@ void QMozViewPrivate::testFlickingMode(QTouchEvent *event)
             mLastPos = QPointF();
             mSecondLastPos = QPointF();
         } else if (event->type() == QEvent::TouchUpdate && !mLastPos.isNull()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            const QSizeF pressArea = tp.ellipseDiameters();
+#else
             QRectF pressArea = tp.rect();
+#endif
             qreal touchHorizontalThreshold = pressArea.width() * 2;
             qreal touchVerticalThreshold = pressArea.height() * 2;
             if (!mLastStationaryPos.isNull() && (qAbs(mLastStationaryPos.x() - touchPos.x()) > touchHorizontalThreshold
@@ -2579,7 +2583,11 @@ void QMozViewPrivate::wheelEvent(QWheelEvent *event)
         const quint64 tabId = selectedChromeTabId();
         if (tabId) {
             QtMoz::chromeSessionSendWheelEvent(
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+                    this, tabId, event->position().toPoint().x(), event->position().toPoint().y(),
+#else
                     this, tabId, event->pos().x(), event->pos().y(),
+#endif
                     QDateTime::currentMSecsSinceEpoch(),
                     delta.x(), delta.y(), 0,
                     MozKey::QtModifierToDOMModifier(
@@ -2868,12 +2876,18 @@ bool QMozViewPrivate::handleAsyncMessage(
         } else if (callback.isCallable()) {
             // Over here callback should never be non-callable.
             QJSValueList args;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            // Qt6 QJSValue has no engine(): use the view's QML engine.
+            QJSEngine * const engine = qjsEngine(q);
+#else
+            QJSEngine * const engine = callback.engine();
+#endif
             if (stringified) {
                 QJsonDocument doc = QJsonDocument::fromJson(result.toString().toUtf8());
                 QVariant vdata = doc.toVariant();
-                args = { callback.engine()->toScriptValue<QVariant>(vdata) };
+                args = { engine->toScriptValue<QVariant>(vdata) };
             } else {
-                args = { callback.engine()->toScriptValue<QVariant>(result) };
+                args = { engine->toScriptValue<QVariant>(result) };
             }
             QJSValue result = callback.call(args);
             if (result.isError()) {
@@ -2913,7 +2927,7 @@ bool QMozViewPrivate::handleAsyncMessage(
         return true;
     } else if (message == QLatin1String(INPUTMETHOD_SET_INPUT_ATTRIBUTES)) {
         QVariantMap map = data.toMap();
-        mInputMethodAttributes = 0;
+        mInputMethodAttributes = Qt::InputMethodHints();
         if (map.value(QLatin1String("autocomplete")) == QLatin1String("off")) {
             mInputMethodAttributes |= Qt::ImhNoPredictiveText | Qt::ImhSensitiveData;
         }
@@ -2926,7 +2940,7 @@ bool QMozViewPrivate::handleAsyncMessage(
         qGuiApp->inputMethod()->update(Qt::ImHints);
         return true;
     } else if (message == QLatin1String(INPUTMETHOD_RESET_INPUT_ATTRIBUTES)) {
-        mInputMethodAttributes = 0;
+        mInputMethodAttributes = Qt::InputMethodHints();
         qGuiApp->inputMethod()->update(Qt::ImHints);
         return true;
     }

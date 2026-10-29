@@ -21,7 +21,15 @@ public:
     QMozExtTexture();
     ~QMozExtTexture();
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     int textureId() const override;
+    void bind() override;
+#else
+    // Qt6 samples the imported texture through a QSGTexture made by
+    // QuickMozView; this object only consumes Gecko's leased frames.
+    qint64 comparisonKey() const override;
+    uint glTextureId() const;
+#endif
     QSize textureSize() const override;
     bool hasAlphaChannel() const override;
     bool hasMipmaps() const override;
@@ -31,7 +39,6 @@ public:
     bool usesExternalTexture() const;
     Q_DECL_HIDDEN void requirePlatformFrame(
             const QSize &size, quint64 revision);
-    void bind() override;
     bool updateTexture() override;
 
 Q_SIGNALS:

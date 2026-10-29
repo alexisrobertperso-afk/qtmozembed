@@ -22,7 +22,11 @@
 #include <QTimer>
 #include <QMutexLocker>
 #include <QtQuick/qquickwindow.h>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QtOpenGL/QOpenGLShaderProgram>
+#else
 #include <QtGui/QOpenGLShaderProgram>
+#endif
 #include <QtGui/QOpenGLContext>
 #include <QRunnable>
 #include <QScreen>
@@ -31,7 +35,9 @@
 #include <QQmlInfo>
 
 #include "qmozview_p.h"
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0) || defined(QT_OPENGL_ES_2)
 #include "qmozextmaterialnode.h"
+#endif
 #include "qmozscrolldecorator.h"
 #include "qmozexttexture.h"
 #include "qmozwindow.h"
@@ -195,13 +201,21 @@ void QuickMozView::itemChange(ItemChange change, const ItemChangeData &data)
     QQuickItem::itemChange(change, data);
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+void QuickMozView::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+#else
 void QuickMozView::geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry)
+#endif
 {
     updateContentSize(QSizeF(
                 mExplicitViewportWidth ? d->mSize.width() : newGeometry.width(),
                 mExplicitViewportHeight ? d->mSize.height() : newGeometry.height()));
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QQuickItem::geometryChange(newGeometry, oldGeometry);
+#else
     QQuickItem::geometryChanged(newGeometry, oldGeometry);
+#endif
 }
 
 QSGNode * QuickMozView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
@@ -252,6 +266,11 @@ QSGNode * QuickMozView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
         return node;
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) && !defined(QT_OPENGL_ES_2)
+    // Desktop OpenGL (Qt6): no presentation path yet.
+    delete oldNode;
+    return nullptr;
+#else
     if (!mTexture) {
         delete oldNode;
         oldNode = nullptr;
@@ -303,6 +322,7 @@ QSGNode * QuickMozView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     node->markDirty(QSGNode::DirtyMaterial);
 
     return node;
+#endif
 }
 
 void QuickMozView::releaseResources()

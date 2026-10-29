@@ -13,7 +13,10 @@
 #include <nsIX509Cert.h>
 #include <mozilla/embedlite/EmbedLiteApp.h>
 #include <mozilla/embedlite/EmbedLiteSecurity.h>
+#if __has_include(<systemsettings/certificatemodel.h>)
 #include <systemsettings/certificatemodel.h>
+#define QMOZ_HAVE_CERTIFICATE_MODEL 1
+#endif
 
 #include "qmozembedlog.h"
 #include "qmozcontext.h"
@@ -365,6 +368,7 @@ const QDateTime QMozSecurity::expiryDate() const
 
 QVariantMap QMozSecurity::serverCertDetails() const
 {
+#ifdef QMOZ_HAVE_CERTIFICATE_MODEL
     QList<Certificate> certList = CertificateModel::getCertificates(m_serverCertificate.toPem());
 
     if (certList.isEmpty()) {
@@ -372,6 +376,10 @@ QVariantMap QMozSecurity::serverCertDetails() const
     }
 
     return certList.first().details();
+#else
+    // Without Sailfish's certificate model, details are not decoded here.
+    return QVariantMap();
+#endif
 }
 
 bool QMozSecurity::certIsNull() const

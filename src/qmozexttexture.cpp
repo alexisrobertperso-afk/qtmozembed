@@ -11,6 +11,7 @@
 #include "runtime/qmoztexturelease_p.h"
 
 #include <QOpenGLFunctions>
+#include "qmozglcompat_p.h"
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -75,10 +76,22 @@ QMozExtTexture::~QMozExtTexture()
     QtMoz::finishTexturePlatformFrameDestruction(this);
 }
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 int QMozExtTexture::textureId() const
 {
     return m_textureId;
 }
+#else
+qint64 QMozExtTexture::comparisonKey() const
+{
+    return m_textureId;
+}
+
+uint QMozExtTexture::glTextureId() const
+{
+    return m_textureId;
+}
+#endif
 
 QSize QMozExtTexture::textureSize() const
 {
@@ -115,6 +128,7 @@ void QMozExtTexture::requirePlatformFrame(const QSize &size, quint64 revision)
     }
 }
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 void QMozExtTexture::bind()
 {
     glBindTexture(glTextureTarget(m_textureTarget), m_textureId);
@@ -126,6 +140,7 @@ void QMozExtTexture::bind()
         }
     }
 }
+#endif
 
 bool QMozExtTexture::updateTexture()
 {
@@ -202,7 +217,9 @@ bool QMozExtTexture::updateTexture()
             if (newTextureTarget == QMozTextureTarget::ExternalOES) {
                 updateExternalTextureParameters();
             } else {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
                 updateBindOptions(true);
+#endif
             }
             return true;
         }, [&]() {
@@ -269,7 +286,9 @@ bool QMozExtTexture::updateTexture()
             if (usesExternalTexture()) {
                 updateExternalTextureParameters();
             } else {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
                 updateBindOptions(true);
+#endif
             }
         }
     });

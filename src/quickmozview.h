@@ -10,11 +10,20 @@
 #ifndef QuickMozView_H
 #define QuickMozView_H
 
+#include <QtGlobal>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QTransform>
+#else
 #include <QMatrix>
+#endif
 #include <QMutex>
 #include <QVariantList>
 #include <QtQuick/QQuickItem>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QtOpenGL/QOpenGLShaderProgram>
+#else
 #include <QtGui/QOpenGLShaderProgram>
+#endif
 #include "qmozview_defined_wrapper.h"
 
 QT_BEGIN_NAMESPACE
@@ -23,6 +32,20 @@ QT_END_NAMESPACE
 
 class QMozViewPrivate;
 class QAbstractItemModel;
+
+// Qt6 moc needs the complete types behind pointer properties.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+Q_MOC_INCLUDE(<QAbstractItemModel>)
+Q_MOC_INCLUDE("qmozscrolldecorator.h")
+Q_MOC_INCLUDE("qmozsecurity.h")
+#endif
+
+// Qt6 moc needs the complete types behind pointer properties.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+Q_MOC_INCLUDE(<QAbstractItemModel>)
+Q_MOC_INCLUDE("qmozscrolldecorator.h")
+Q_MOC_INCLUDE("qmozsecurity.h")
+#endif
 class QMozWindow;
 class QMozSecurity;
 
@@ -129,7 +152,11 @@ protected:
     void requestPresentationUpdate();
     bool releasePresentation();
     void itemChange(ItemChange change, const ItemChangeData &) override;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+#else
     void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+#endif
     QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *data) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
