@@ -52,7 +52,11 @@ QMozRuntime::QMozRuntime(EmbedLiteAppListener *listener, QObject *parent)
     , mQtPump(nullptr)
     , mEmbedStarted(false)
 {
-    Q_ASSERT_X(LoadEmbedLite(), __PRETTY_FUNCTION__, "Failed load XPCOMGlue");
+    // Not inside Q_ASSERT: release builds compile assertions out, and this
+    // call loads libxul and creates Gecko's bootstrap (SQLite lifetime included).
+    if (!LoadEmbedLite()) {
+        qFatal("%s: Failed load XPCOMGlue", __PRETTY_FUNCTION__);
+    }
 
     mApp = XRE_GetEmbedLite();
     mApp->SetListener(listener);

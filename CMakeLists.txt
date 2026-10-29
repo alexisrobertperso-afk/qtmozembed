@@ -68,6 +68,9 @@ target_link_options(qt6mozembed PRIVATE -rdynamic -Wl,--disable-new-dtags)
 set_target_properties(qt6mozembed PROPERTIES
     BUILD_RPATH "${GECKO_RUNTIMEDIR}"
     INSTALL_RPATH "${GECKO_RUNTIMEDIR}")
+# Executables linking this library let the linker resolve libxul's own
+# dependencies (libgkcodecs, libmozsandbox, ...) in the engine directory.
+target_link_options(qt6mozembed INTERFACE "LINKER:-rpath-link,${GECKO_RUNTIMEDIR}")
 
 file(GLOB QTMOZEMBED_PUBLIC_HEADERS src/q*.h)
 list(FILTER QTMOZEMBED_PUBLIC_HEADERS EXCLUDE REGEX "(_p\\.h|qmessagepump\\.h|qmozextmaterialnode\\.h|qmozexttexture\\.h)$")

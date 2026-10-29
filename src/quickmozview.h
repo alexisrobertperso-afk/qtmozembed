@@ -135,6 +135,9 @@ Q_SIGNALS:
     void backgroundMediaEnabledChanged();
     void throttlePaintingChanged();
     void platformFrameGenerationChanged();
+    // Gecko's frames cannot be shown. reason: "lease-attach-failed" or
+    // "external-oes-unsupported".
+    void renderingFailed(const QString &reason);
     void touched();
 
     Q_MOZ_VIEW_SIGNALS
@@ -200,6 +203,11 @@ private:
     bool mFollowItemGeometry;
     int mPlatformFrameGeneration;
     quint64 mPlatformFrameRequirement = 1;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) && !defined(QT_OPENGL_ES_2)
+    uint mWrappedTextureId = 0;
+    QSize mWrappedTextureSize;
+    bool mRenderingFailureReported = false;
+#endif
 };
 
 #endif // QuickMozView_H

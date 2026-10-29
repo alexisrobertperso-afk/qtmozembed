@@ -32,6 +32,9 @@
 #include <QScreen>
 #include <QSGSimpleRectNode>
 #include <QSGSimpleTextureNode>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) && !defined(QT_OPENGL_ES_2)
+#include <QtQuick/qsgtexture_platform.h>
+#endif
 #include <QQmlInfo>
 
 #include "qmozview_p.h"
@@ -76,6 +79,11 @@ private:
 QSizeF webContentWindowSize(Qt::ScreenOrientation orientation, const QSizeF &size)
 {
     // Set size for EmbedLiteWindow in screen native orientation.
+    // Qt::PrimaryOrientation is the screen's own orientation: no rotation.
+    // (Treating it as portrait transposes the window on landscape desktops.)
+    if (orientation == Qt::PrimaryOrientation) {
+        orientation = qApp->primaryScreen()->primaryOrientation();
+    }
     QSizeF result = size;
     if ((qApp->primaryScreen()->primaryOrientation() == Qt::PortraitOrientation)
             == (orientation == Qt::LandscapeOrientation || orientation == Qt::InvertedLandscapeOrientation)) {
@@ -267,9 +275,74 @@ QSGNode * QuickMozView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     }
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) && !defined(QT_OPENGL_ES_2)
-    // Desktop OpenGL (Qt6): no presentation path yet.
-    delete oldNode;
-    return nullptr;
+    // Desktop OpenGL (Qt6): Gecko leases an EGL image; the consumer imports
+    // it as a GL_TEXTURE_2D and the stock texture node draws it. Until the
+    // first frame arrives, paint the page background.
+    auto reportFailure = [this](const QString &reason) {
+        if (mRenderingFailureReported)
+            return;
+        mRenderingFailureReported = true;
+        qCCritical(lcEmbedLiteExt) << "Cannot show Gecko frames:" << reason;
+        QMetaObject::invokeMethod(this, [this, reason] { Q_EMIT renderingFailed(reason); },
+                                  Qt::QueuedConnection);
+    };
+
+    if (!mTexture) {
+        QMozExtTexture * const consumer = new QMozExtTexture;
+        mTexture = consumer;
+        connect(consumer, &QMozExtTexture::platformFrameAcquired,
+                this, &QuickMozView::platformFrameAcquired, Qt::QueuedConnection);
+        if (!QtMoz::attachTextureFrameLease(consumer, d->mMozWindow.data(), this,
+                                            QtMoz::textureFrameConsumerId(this), window())) {
+            delete consumer;
+            mTexture = nullptr;
+            delete oldNode;
+            reportFailure(QStringLiteral("lease-attach-failed"));
+            return nullptr;
+        }
+        connect(consumer, &QMozExtTexture::withPlatformImage,
+                d->mMozWindow, &QMozWindow::withPlatformImage, Qt::DirectConnection);
+        mWrappedTextureId = 0;
+    }
+
+    QMozExtTexture * const consumer = static_cast<QMozExtTexture *>(mTexture);
+    consumer->requirePlatformFrame(d->mSize.toSize(), mPlatformFrameRequirement);
+    consumer->updateTexture();
+    if (consumer->usesExternalTexture())
+        reportFailure(QStringLiteral("external-oes-unsupported"));
+
+    const uint textureId = consumer->usesExternalTexture() ? 0 : consumer->glTextureId();
+    if (textureId == 0) {
+        auto *rect = dynamic_cast<QSGSimpleRectNode *>(oldNode);
+        if (!rect) {
+            delete oldNode;
+            rect = new QSGSimpleRectNode;
+        }
+        rect->setColor(d->mBackgroundColor);
+        rect->setRect(boundingRect);
+        return rect;
+    }
+
+    auto *node = dynamic_cast<QSGSimpleTextureNode *>(oldNode);
+    if (!node) {
+        delete oldNode;
+        node = new QSGSimpleTextureNode;
+        node->setOwnsTexture(true);
+        node->setFiltering(QSGTexture::Linear);
+        // Gecko's frames are bottom-up (GL convention).
+        node->setTextureCoordinatesTransform(QSGSimpleTextureNode::MirrorVertically);
+        mWrappedTextureId = 0;
+    }
+    if (textureId != mWrappedTextureId || consumer->textureSize() != mWrappedTextureSize) {
+        // The wrapper does not own the GL texture: the consumer deletes it
+        // when the next frame replaces it.
+        node->setTexture(QNativeInterface::QSGOpenGLTexture::fromNative(
+                textureId, window(), consumer->textureSize(), QQuickWindow::TextureIsOpaque));
+        mWrappedTextureId = textureId;
+        mWrappedTextureSize = consumer->textureSize();
+    }
+    node->setRect(boundingRect);
+    return node;
 #else
     if (!mTexture) {
         delete oldNode;

@@ -2258,6 +2258,13 @@ void QMozViewPrivate::OnFirstPaint(int32_t aX, int32_t aY)
     qCInfo(lcEmbedLiteExt);
 #endif
     mIsPainted = true;
+    // EmbedLite's compositor starts paused and drops ResumeRendering() until
+    // its WebRender bridge exists; by the first paint it does. An active view
+    // that was never resumed (QML "active: true" before the window existed)
+    // would otherwise never composite.
+    if (mActive && mMozWindow) {
+        mMozWindow->resumeRendering();
+    }
     mViewIface->firstPaint(aX, aY);
     if (mMozWindow) {
         mMozWindow->scheduleUpdate();
